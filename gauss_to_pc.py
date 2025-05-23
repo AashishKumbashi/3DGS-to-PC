@@ -622,8 +622,9 @@ def config_parser():
 
     return args
 
-def main():
-    args = config_parser()
+def main(args=None):
+    if args is None:
+        args = config_parser()
 
     # All config info required for generating the point cloud
     pointcloud_settings = GaussPointCloudSettings(
