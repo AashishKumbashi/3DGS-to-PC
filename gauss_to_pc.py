@@ -181,8 +181,52 @@ def create_new_gaussian_points(num_points_to_sample, means, covariances, colours
 
         gaussians_to_add_idxs = gaussians_to_add.nonzero().squeeze(1)
 
+                # Use cholesky_ex so we get per-matrix status:
+        L, info = torch.linalg.cholesky_ex(new_covariances_for_point)
+
+        # Keep only Gaussians that passed Cholesky:
+        valid_mask = info == 0
+
+        if valid_mask.sum() == 0:
+            print("All Gaussians failed Cholesky — skip this iteration")
+            i += 1
+            continue
+
+        # Keep only valid ones:
+        new_means_for_point = new_means_for_point[valid_mask]
+        valid_Ls = L[valid_mask]
+        new_colours_for_point = new_colours_for_point[valid_mask]
+        new_normals_for_point = new_normals_for_point[valid_mask] if normals is not None else None
+                # Use scale_tril instead of covariance_matrix
+        # Now all these are guaranteed safe:
+        mv = MultivariateNormal(new_means_for_point, scale_tril=valid_Ls)
+        original_sampled_points = mv.sample((num_points_to_sample,))
+
+
+
+        
+        # Robust sampling: Cholesky with fallback jitter
+        # try:
+        #     L = torch.linalg.cholesky(new_covariances_for_point)
+        # except RuntimeError:
+        #     # Small jitter to diagonal in case of numerical non-PD
+        #     jitter = 1e-4
+        #     new_covariances_for_point = new_covariances_for_point + jitter * torch.eye(3, device=new_covariances_for_point.device).expand_as(new_covariances_for_point)
+
+        #     # try:
+        #     #     L = torch.linalg.cholesky(new_covariances_for_point)
+        #     # except RuntimeError:
+        #     #     # Still bad — skip this Gaussian
+        #     #     print(f"Skipping degenerate Gaussian {new_colours_for_point}]")
+        #     #     continue
+        #     L = torch.linalg.cholesky(new_covariances_for_point)
+
+        # # Use scale_tril instead of covariance_matrix
+        # mv = MultivariateNormal(new_means_for_point, scale_tril=L)
+        # original_sampled_points = mv.sample((num_points_to_sample,))
+
         # Sample 'num_points_to_sample' number of points for each gaussian
-        original_sampled_points = MultivariateNormal(new_means_for_point, new_covariances_for_point).sample((num_points_to_sample,))
+        # original_sampled_points = MultivariateNormal(new_means_for_point, new_covariances_for_point).sample((num_points_to_sample,))
 
         sampled_points = original_sampled_points.transpose(0, 1).contiguous().view(-1, original_sampled_points.size(2))
 

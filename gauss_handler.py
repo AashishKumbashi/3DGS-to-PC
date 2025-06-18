@@ -156,6 +156,19 @@ class Gaussians():
         non_positive_covariances = self.non_posdef_covariances(self.covariances, epsilon=min_ps_epsilon)
         if non_positive_covariances.sum() > 0:
             self.filter_gaussians(~non_positive_covariances)
+        # Check how many eigenvalues are negative
+                        # Check how many eigenvalues are negative
+
+        # ✅ Batch Cholesky check: no loop
+        L, info = torch.linalg.cholesky_ex(self.covariances)
+        valid_mask = info == 0
+        print(f"Number of Gaussians failing Cholesky: {(~valid_mask).sum().item()}")
+        print(f'Number of Gaussians before filtering: {self.covariances.shape}')
+        self.filter_gaussians(valid_mask)
+        print(f'Number of Gaussians after filtering: {self.covariances.shape}')
+
+        # num_negative_eigenvalues = torch.sum(torch.linalg.eigvals(self.covariances).real <= min_ps_epsilon, dim=1)
+        # print(f"Number of Gaussians with negative eigenvalues: {num_negative_eigenvalues.sum().item()}")
 
     def filter_gaussians(self, filter_indices):
         """
